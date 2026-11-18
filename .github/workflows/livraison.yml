@@ -1,0 +1,48 @@
+# Nom du workflow, affiché dans l'onglet Actions.
+name: livraison
+
+# DÉCLENCHEUR : quand le workflow se lance.
+# push d'un TAG dont le nom commence par "v" (v1.0.0, v2.3.1...).
+# Différence avec ci.yml : ci.yml se lance sur les push de BRANCHES et les pull requests,
+# celui-ci seulement quand on publie une version avec un tag.
+on: {push: {tags: ["v*"]}}
+
+# DROITS du jeton GitHub pour ce workflow.
+# write : créer une release, c'est écrire dans le dépôt.
+# ci.yml n'a que "read" car il ne fait que lire le code pour le tester.
+# Principe du MOINDRE PRIVILÈGE : chaque workflow n'a que les droits dont il a besoin.
+permissions:
+  contents: write
+
+jobs:
+  # Un job = une suite d'étapes exécutées sur une même machine.
+  release:
+    # Machine neuve Ubuntu fournie par GitHub (le "runner"), détruite après le job.
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Télécharger le code du dépôt, à la version du tag, sur la machine.
+      #    persist-credentials: false : ne pas laisser le jeton dans .git (moindre privilège).
+      - uses: actions/checkout@v7
+        with: {persist-credentials: false}
+
+      # 2. Installer Python 3.12 (même version que ci.yml et que le codespace).
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.12"}
+
+      # 3. Installer les dépendances de l'API (FastAPI, pytest...).
+      - run: pip install -r requirements.txt
+
+      # 4. Relancer les tests AVANT de publier.
+      #    Si un test échoue : step rouge, job arrêté, aucune release créée.
+      #    On ne livre jamais une version cassée.
+      - run: pytest
+
+      # 5. Créer la release sur GitHub avec la CLI "gh".
+      #    $GITHUB_REF_NAME : nom du tag qui a déclenché le workflow (ex : v1.0.0).
+      #    -F CHANGELOG.md : le texte de la release est lu dans ce fichier.
+      - run: gh release create "$GITHUB_REF_NAME" -F CHANGELOG.md
+        env:
+          # gh lit son jeton d'authentification dans la variable GH_TOKEN.
+          # secrets.GITHUB_TOKEN : jeton temporaire créé automatiquement par GitHub
+          # pour chaque exécution, avec les droits définis dans "permissions".
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
