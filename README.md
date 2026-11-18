@@ -1,3 +1,5 @@
+![ci](https://github.com/SpaceCowBoyCESI/kelvia-api/actions/workflows/ci.yml/badge.svg)
+
 # Kelvia — billetterie en ligne de festivals
 
 > Cas fictif, exercice pédagogique.
